@@ -5,6 +5,7 @@ struct MapViewRepresentable: UIViewRepresentable {
     var location: CLLocationCoordinate2D?
     var crimeCount: Int?
     var crimeRisk: String?
+    @Binding var region: MKCoordinateRegion
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -13,12 +14,7 @@ struct MapViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
-
-        // 초기 줌: 대한민국 중심
-        let koreaCenter = CLLocationCoordinate2D(latitude: 36.5, longitude: 127.5)
-        let region = MKCoordinateRegion(center: koreaCenter, latitudinalMeters: 500_000, longitudinalMeters: 500_000)
         mapView.setRegion(region, animated: false)
-
         return mapView
     }
 
@@ -29,14 +25,10 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         let glyphText: String
         switch crimeRisk {
-        case "위험":
-            glyphText = "🚨"
-        case "보통":
-            glyphText = "⚠️"
-        case "안전":
-            glyphText = "✅"
-        default:
-            glyphText = "❔"
+        case "위험": glyphText = "🚨"
+        case "보통": glyphText = "⚠️"
+        case "안전": glyphText = "✅"
+        default: glyphText = "❔"
         }
 
         let subtitleText = crimeCount != nil ? "총 \(crimeCount!)건 발생" : "건수 정보 없음"
@@ -47,10 +39,23 @@ struct MapViewRepresentable: UIViewRepresentable {
             subtitle: subtitleText,
             glyphText: glyphText
         )
+
         uiView.addAnnotation(annotation)
 
-        let region = MKCoordinateRegion(center: coordinate, latitudinalMeters: 10000, longitudinalMeters: 10000)
-        uiView.setRegion(region, animated: true)
+        // 전국 중심이면 지도 이동은 생략, 아니면 이동
+        if !isShowingNationwideCenter(coordinate: coordinate) {
+            let newRegion = MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.2, longitudeDelta: 0.2)
+            )
+            uiView.setRegion(newRegion, animated: true)
+        }
+        
+        // ✅ region이 바뀌었는지 비교 후, 반영
+        if uiView.region.center.latitude != region.center.latitude ||
+            uiView.region.center.longitude != region.center.longitude {
+            uiView.setRegion(region, animated: true)
+        }
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {
@@ -69,24 +74,21 @@ struct MapViewRepresentable: UIViewRepresentable {
             if view == nil {
                 view = MKMarkerAnnotationView(annotation: crimeAnnotation, reuseIdentifier: identifier)
                 view?.canShowCallout = true
-                view?.markerTintColor = .white
-                view?.glyphText = crimeAnnotation.glyphText
-                view?.titleVisibility = .visible
-                view?.subtitleVisibility = .visible
-
-                // ✅ 커스텀 콜아웃: 범죄 건수 텍스트
-                let subtitleLabel = UILabel()
-                subtitleLabel.text = crimeAnnotation.subtitle
-                subtitleLabel.font = UIFont.boldSystemFont(ofSize: 16)
-                subtitleLabel.textColor = .darkGray
-                view?.detailCalloutAccessoryView = subtitleLabel
             } else {
                 view?.annotation = crimeAnnotation
-                view?.glyphText = crimeAnnotation.glyphText
-                if let label = view?.detailCalloutAccessoryView as? UILabel {
-                    label.text = crimeAnnotation.subtitle
-                }
             }
+
+            // ✅ 공통 설정을 여기에 모두 다시 해줌 (재사용될 경우를 대비)
+            view?.markerTintColor = .white  // 항상 흰색으로 설정
+            view?.glyphText = crimeAnnotation.glyphText
+            view?.titleVisibility = .visible
+            view?.subtitleVisibility = .visible
+
+            let subtitleLabel = UILabel()
+            subtitleLabel.text = crimeAnnotation.subtitle
+            subtitleLabel.font = UIFont.boldSystemFont(ofSize: 16)
+            subtitleLabel.textColor = .darkGray
+            view?.detailCalloutAccessoryView = subtitleLabel
 
             return view
         }
@@ -94,7 +96,15 @@ struct MapViewRepresentable: UIViewRepresentable {
     }
 }
 
-// 사용자 정의 MKAnnotation 클래스
+// MARK: - 중심좌표 판별 함수
+private func isShowingNationwideCenter(coordinate: CLLocationCoordinate2D) -> Bool {
+    let center = CLLocationCoordinate2D(latitude: 36.5, longitude: 127.5)
+    let threshold = 0.01
+    return abs(coordinate.latitude - center.latitude) < threshold &&
+           abs(coordinate.longitude - center.longitude) < threshold
+}
+
+// MARK: - 사용자 정의 Annotation
 class CrimeAnnotation: NSObject, MKAnnotation {
     let coordinate: CLLocationCoordinate2D
     let title: String?

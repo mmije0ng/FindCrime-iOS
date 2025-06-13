@@ -1,23 +1,21 @@
+
 import SwiftUI
 import MapKit
 import CoreLocation
 
+let categoryData = CategoryData.load()
+
 struct CrimeStatsMapView: View {
-    @State private var selectedSido: String = "경기도"
-    @State private var selectedGugun: String = "수원시"
+    @State private var selectedSido: String = "전국"
+    @State private var selectedGugun: String = "전국전체"
+    @State private var selectedCrimeType: String = ""
+    @State private var selectedCrimeDetailType: String = ""
     @State private var selectedYear: String = "2023"
-    @State private var selectedCrimeType: String = "지능범죄"
-    @State private var selectedCrimeDetailType: String = "사기"
 
     @State private var crimeCount: Int?
     @State private var crimeRisk: String?
-    @State private var location: CLLocationCoordinate2D? = nil
-
-    let sidos = ["서울", "경기도"]
-    let guguns = ["성북구", "수원시", "경기도전체"]
-    let years = ["2023"]
-    let crimeTypes = ["강력범죄", "지능범죄"]
-    let crimeDetailTypes = ["살인기수", "강도", "사기"]
+    @State private var region: MKCoordinateRegion = regionCoordinates["전국"]!
+    @State private var markerCoordinate: CLLocationCoordinate2D? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,19 +25,24 @@ struct CrimeStatsMapView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    // 연도 단독 Picker
-                    LabeledPicker(title: "연도", selection: $selectedYear, options: years)
+                    LabeledPicker(title: "연도", selection: $selectedYear, options: ["2023"])
 
-                    // 시/도 + 구/군 가로 배치
                     HStack(spacing: 12) {
-                        LabeledPicker(title: "시·도", selection: $selectedSido, options: sidos)
-                        LabeledPicker(title: "구·군", selection: $selectedGugun, options: guguns)
+                        LabeledPicker(title: "시·도", selection: $selectedSido, options: Array(categoryData.areaMap.keys).sorted())
+                            .onChange(of: selectedSido) {
+                                selectedGugun = categoryData.areaMap[selectedSido]?.first ?? ""
+                            }
+
+                        LabeledPicker(title: "구·군", selection: $selectedGugun, options: categoryData.areaMap[selectedSido] ?? [])
                     }
 
-                    // 범죄 유형 + 상세 유형 가로 배치
                     HStack(spacing: 12) {
-                        LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: crimeTypes)
-                        LabeledPicker(title: "범죄 세부", selection: $selectedCrimeDetailType, options: crimeDetailTypes)
+                        LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: Array(categoryData.crimeTypeMap.keys).sorted())
+                            .onChange(of: selectedCrimeType) {
+                                selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+                            }
+
+                        LabeledPicker(title: "범죄 세부", selection: $selectedCrimeDetailType, options: categoryData.crimeTypeMap[selectedCrimeType] ?? [])
                     }
 
                     Button(action: fetchCrimeStats) {
@@ -56,12 +59,15 @@ struct CrimeStatsMapView: View {
                 .padding(.horizontal)
             }
 
-            // 지도 화면
-            MapViewRepresentable(location: location, crimeCount: crimeCount, crimeRisk: crimeRisk)
-                .frame(minHeight: 470, maxHeight: .infinity)
+            MapViewRepresentable(location: markerCoordinate, crimeCount: crimeCount, crimeRisk: crimeRisk, region: $region)
+                .frame(minHeight: 380, maxHeight: .infinity)
         }
-        .background(Color(UIColor.systemGroupedBackground))
-        .edgesIgnoringSafeArea(.bottom)
+        .onAppear {
+            if selectedCrimeType.isEmpty {
+                selectedCrimeType = Array(categoryData.crimeTypeMap.keys).sorted().first ?? ""
+                selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+            }
+        }
     }
 
     func fetchCrimeStats() {
@@ -74,16 +80,47 @@ struct CrimeStatsMapView: View {
             guard let data = data,
                   let decoded = try? JSONDecoder().decode(CrimeStatsResponse.self, from: data) else { return }
 
-            CLGeocoder().geocodeAddressString("\(selectedSido) \(selectedGugun)") { placemarks, _ in
-                DispatchQueue.main.async {
-                    self.crimeCount = decoded.result.crimeCount
-                    self.crimeRisk = decoded.result.crimeRisk
-                    if let coordinate = placemarks?.first?.location?.coordinate {
-                        self.location = coordinate
-                    }
-                }
+            DispatchQueue.main.async {
+                self.crimeCount = decoded.result.crimeCount
+                self.crimeRisk = decoded.result.crimeRisk
+                self.updateRegionAndMarker()
             }
         }.resume()
+    }
+
+    func updateRegionAndMarker() {
+        let combined = "\(selectedSido)\(selectedGugun)"
+
+        if selectedGugun == "전국전체" {
+            print("전국전체")
+            region = regionCoordinates["전국"]!  // ✅ 지도도 다시 설정
+            markerCoordinate = CLLocationCoordinate2D(latitude: 36.5, longitude: 127.5)
+            return
+        }
+
+        if selectedGugun.contains("전체"), let coord = regionCenterCoordinates[selectedSido] {
+            region = regionCoordinates["전국"]!
+            markerCoordinate = coord
+        } else {
+            let address = "\(selectedSido) \(selectedGugun)"
+            CLGeocoder().geocodeAddressString(address) { placemarks, _ in
+                if let coordinate = placemarks?.first?.location?.coordinate {
+                    region = MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.2, longitudeDelta: 0.2)
+                    )
+                    markerCoordinate = coordinate
+                }
+            }
+        }
+    }
+    
+    func isShowingNationwideCenter(coordinate: CLLocationCoordinate2D) -> Bool {
+        // 중심값 근처 좌표인지 확인 (대한민국 중심 좌표)
+        let center = CLLocationCoordinate2D(latitude: 36.5, longitude: 127.5)
+        let threshold = 0.01
+        return abs(coordinate.latitude - center.latitude) < threshold &&
+               abs(coordinate.longitude - center.longitude) < threshold
     }
 }
 
@@ -105,3 +142,23 @@ struct LabeledPicker: View {
         }
     }
 }
+
+let regionCoordinates: [String: MKCoordinateRegion] = [
+    "전국": MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 36.5, longitude: 127.8),
+        span: MKCoordinateSpan(latitudeDelta: 6.5, longitudeDelta: 6.5)
+    ),
+//    "서울": MKCoordinateRegion(
+//        center: CLLocationCoordinate2D(latitude: 37.5665, longitude: 126.9780),
+//        span: MKCoordinateSpan(latitudeDelta: 0.2, longitudeDelta: 0.2)
+//    )
+//    // 필요시 추가
+]
+
+let regionCenterCoordinates: [String: CLLocationCoordinate2D] = [
+    "전국": CLLocationCoordinate2D(latitude: 36.5, longitude: 127.8),
+//    "서울": CLLocationCoordinate2D(latitude: 37.5665, longitude: 126.9780),
+//    "경기도": CLLocationCoordinate2D(latitude: 37.4138, longitude: 127.5183),
+//    "부산": CLLocationCoordinate2D(latitude: 35.1796, longitude: 129.0756),
+    // 필요한 시도는 추가
+]
