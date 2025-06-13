@@ -40,6 +40,6 @@ Package.resolved
 *.simstate
 
 # Secrets or Config Files
-FindCrime/Info.plist
+Info.plist
 Secrets.plist
 *.xcconfig

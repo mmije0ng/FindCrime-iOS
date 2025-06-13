@@ -68,7 +68,8 @@ struct MapKitView: UIViewRepresentable {
 
             let identifier = "PoliceMarker"
             let view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-            view.glyphImage = UIImage(systemName: "shield.fill")
+            view.glyphText = "👮"
+//            view.glyphImage = UIImage(systemName: "shield.fill")
             view.markerTintColor = .systemRed
             view.titleVisibility = .visible
             view.subtitleVisibility = .hidden
