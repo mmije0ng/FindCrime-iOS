@@ -28,4 +28,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("❌ 위치 오류: \(error.localizedDescription)")
     }
+    
+    func requestLocationIfNeeded() {
+        if CLLocationManager.locationServicesEnabled() {
+            self.manager.requestLocation()
+        }
+    }
 }
