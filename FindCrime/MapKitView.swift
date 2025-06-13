@@ -4,7 +4,7 @@ import CoreLocation
 
 struct MapKitView: UIViewRepresentable {
     let coordinate: CLLocationCoordinate2D
-    let places: [Place]
+    @Binding var places: [Place]
     @Binding var selectedPlace: Place?
 
     func makeCoordinator() -> Coordinator {
@@ -15,6 +15,10 @@ struct MapKitView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
+        mapView.setRegion(
+            MKCoordinateRegion(center: coordinate, latitudinalMeters: 3000, longitudinalMeters: 3000),
+            animated: false
+        )
         return mapView
     }
 
@@ -33,19 +37,33 @@ struct MapKitView: UIViewRepresentable {
 
         mapView.addAnnotations(annotations)
 
-        if let first = annotations.first {
-            let region = MKCoordinateRegion(center: first.coordinate,
-                                            latitudinalMeters: 3000,
-                                            longitudinalMeters: 3000)
-            mapView.setRegion(region, animated: true)
+        // 자동 확대/중심 이동은 최초에만 하고 이후 regionDidChange에서 처리
+        if mapView.annotations.count == annotations.count, !annotations.isEmpty {
+            mapView.showAnnotations(annotations, animated: true)
         }
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapKitView
+        private var lastUpdateTime: Date = Date()
 
         init(_ parent: MapKitView) {
             self.parent = parent
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let now = Date()
+            if now.timeIntervalSince(lastUpdateTime) < 1.0 {
+                return // 1초 내 중복 호출 방지
+            }
+            lastUpdateTime = now
+
+            let center = mapView.centerCoordinate
+            KakaoMapService().searchPoliceStations(near: center) { places in
+                DispatchQueue.main.async {
+                    self.parent.places = Array(places.prefix(10))
+                }
+            }
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {

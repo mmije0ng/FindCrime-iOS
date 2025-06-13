@@ -9,10 +9,11 @@ struct ContentView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             if let coord = locationManager.lastLocation?.coordinate {
-                MapKitView(coordinate: coord,
-                           places: places,
-                           selectedPlace: $selectedPlace)
-                    .edgesIgnoringSafeArea(.all)
+                MapKitView(
+                    coordinate: coord,
+                    places: $places,
+                    selectedPlace: $selectedPlace
+                )
 
                 if let selected = selectedPlace {
                     VStack(alignment: .leading, spacing: 8) {
