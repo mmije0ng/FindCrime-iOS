@@ -3,7 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     var body: some View {
         TabView {
-            CrimeStatsView()
+            CrimeStatsMapView()
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("통계")
