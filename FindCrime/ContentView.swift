@@ -14,6 +14,7 @@ struct ContentView: View {
                     places: $places,
                     selectedPlace: $selectedPlace
                 )
+                .edgesIgnoringSafeArea(.all)
 
                 if let selected = selectedPlace {
                     VStack(alignment: .leading, spacing: 8) {
@@ -32,15 +33,16 @@ struct ContentView: View {
                     .animation(.easeInOut, value: selectedPlace)
                 }
             } else {
-                Text("위치 불러오는 중...")
+                Text("위치를 불러오는 중입니다...")
             }
         }
-        .onReceive(locationManager.$lastLocation) { location in
-            guard let location = location else { return }
-
-            KakaoMapService().searchPoliceStations(near: location.coordinate) { fetched in
-                DispatchQueue.main.async {
-                    self.places = Array(fetched.prefix(10)) // 최대 10개 제한
+        .onAppear {
+            locationManager.onInitialLocationFix = { location in
+                print("📍 앱 시작 시 위치 고정: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+                KakaoMapService().searchPoliceStations(near: location.coordinate) { fetched in
+                    DispatchQueue.main.async {
+                        self.places = Array(fetched.prefix(10))
+                    }
                 }
             }
         }
