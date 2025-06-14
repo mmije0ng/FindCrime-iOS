@@ -33,14 +33,25 @@ struct ReportView: View {
     @State private var posts: [ReportPost] = []
     @State private var currentPage: Int = 1
     @State private var totalPages: Int = 1
+    @State private var showCreateSheet: Bool = false
 
     let maxVisiblePages = 10
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("지역 제보 조회")
-                .font(.title2.bold())
-                .padding(.vertical)
+            HStack {
+                Text("지역 제보 조회")
+                    .font(.title2.bold())
+                Spacer()
+                Button(action: {
+                    showCreateSheet = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.title2)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
 
             ScrollView {
                 VStack(spacing: 16) {
@@ -59,6 +70,12 @@ struct ReportView: View {
             }
             .onAppear {
                 fetchCrimeStats()
+            }
+            .sheet(isPresented: $showCreateSheet, onDismiss: {
+                currentPage = 1
+                fetchCrimeStats()
+            }) {
+                ReportCreateView()
             }
         }
     }
@@ -135,7 +152,7 @@ struct ReportView: View {
                 }
             }
 
-            ForEach(startPage...endPage, id: \.self) { page in
+            ForEach(startPage...endPage, id: \ .self) { page in
                 Button(action: {
                     currentPage = page
                     fetchCrimeStats()
@@ -186,8 +203,6 @@ struct ReportView: View {
                         posts = decoded.result.postList
                         totalPages = decoded.result.totalPage
                     }
-                    
-                    
                 } catch {
                     print("❌ 디코딩 실패: \(error)")
                 }
@@ -207,13 +222,11 @@ struct ReportView: View {
         if let date = formatter.date(from: trimmed) {
             let display = DateFormatter()
             display.locale = Locale(identifier: "ko_KR")
-            display.dateFormat = "yyyy.MM.dd HH:mm"
+            display.dateFormat = "yyyy.MM.dd\nHH:mm"
             return display.string(from: date)
         } else {
             print("❌ 날짜 파싱 실패: \(trimmed)")
             return trimmed
         }
     }
-
-
 }
