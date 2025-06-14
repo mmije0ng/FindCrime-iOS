@@ -124,25 +124,6 @@ struct CrimeStatsMapView: View {
     }
 }
 
-struct LabeledPicker: View {
-    let title: String
-    @Binding var selection: String
-    let options: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.gray)
-            Picker(selection: $selection, label: Text("")) {
-                ForEach(options, id: \.self) { Text($0) }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
 let regionCoordinates: [String: MKCoordinateRegion] = [
     "전국": MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 36.5, longitude: 127.8),

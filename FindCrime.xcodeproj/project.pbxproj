@@ -20,6 +20,7 @@
 			membershipExceptions = (
 				Info.plist,
 				SceneDelegate.swift,
+				Views/Untitled.swift,
 			);
 			target = 50EA8A8F2DFB3A120049BD23 /* FindCrime */;
 		};
