@@ -2,8 +2,8 @@ import SwiftUI
 import KakaoSDKUser
 
 struct MainIntroView: View {
-    @Binding var isLoggedIn: Bool
     @AppStorage("userId") var userId: Int?
+    @EnvironmentObject var authManager: AuthManager // ✅ 로그인 상태 관리 객체
 
     var body: some View {
         VStack(spacing: 24) {
@@ -25,6 +25,7 @@ struct MainIntroView: View {
 
             Spacer()
 
+            // ✅ 카카오 로그인 버튼
             Button(action: startKakaoLogin) {
                 HStack {
                     Spacer()
@@ -45,6 +46,7 @@ struct MainIntroView: View {
         .padding()
     }
 
+    /// ✅ 카카오 로그인 실행
     func startKakaoLogin() {
         if UserApi.isKakaoTalkLoginAvailable() {
             UserApi.shared.loginWithKakaoTalk { oauthToken, error in
@@ -56,7 +58,7 @@ struct MainIntroView: View {
                 }
             }
         } else {
-            // 카카오계정으로 로그인 (웹)
+            // 웹 브라우저로 로그인
             UserApi.shared.loginWithKakaoAccount { oauthToken, error in
                 if let error = error {
                     print("❌ 카카오계정 로그인 실패: \(error)")
@@ -68,13 +70,12 @@ struct MainIntroView: View {
         }
     }
 
+    /// ✅ 백엔드에 카카오 로그인 accessToken 전달
     func loginToBackend(with accessToken: String) {
         guard let url = URL(string: "http://localhost:8080/api/auth/login/kakao") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-
-        // ✅ Authorization 헤더에 accessToken 추가
         request.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
         URLSession.shared.dataTask(with: request) { data, _, error in
@@ -85,8 +86,9 @@ struct MainIntroView: View {
 
                 if let response = try? JSONDecoder().decode(KakaoLoginResponse.self, from: data) {
                     DispatchQueue.main.async {
+                        // ✅ 로그인 성공 → userId 저장 + 로그인 상태 전환
                         self.userId = response.result.userId
-                        self.isLoggedIn = true
+                        self.authManager.isLoggedIn = true
                     }
                 } else {
                     print("❌ 백엔드 응답 파싱 실패 (디코딩 실패)")
@@ -98,6 +100,7 @@ struct MainIntroView: View {
     }
 }
 
+// MARK: - 백엔드 응답 모델
 struct KakaoLoginResponse: Decodable {
     let isSuccess: Bool
     let code: String
