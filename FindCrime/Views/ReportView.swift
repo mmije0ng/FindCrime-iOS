@@ -34,48 +34,54 @@ struct ReportView: View {
     @State private var currentPage: Int = 1
     @State private var totalPages: Int = 1
     @State private var showCreateSheet: Bool = false
+    @State private var selectedPostId: Int? = nil
 
     let maxVisiblePages = 10
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("지역 제보 조회")
-                    .font(.title2.bold())
-                Spacer()
-                Button(action: {
-                    showCreateSheet = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            ScrollView {
-                VStack(spacing: 16) {
-                    categorySelectors
-
-                    tableHeader
-
-                    ForEach(posts) { post in
-                        tableRow(post: post)
-                        Divider()
+        NavigationView {
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Text("지역 제보 조회")
+                        .font(.title2.bold())
+                    Spacer()
+                    Button(action: {
+                        showCreateSheet = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2)
                     }
-
-                    paginationControls
                 }
-                .padding()
-            }
-            .onAppear {
-                fetchCrimeStats()
-            }
-            .sheet(isPresented: $showCreateSheet, onDismiss: {
-                currentPage = 1
-                fetchCrimeStats()
-            }) {
-                ReportCreateView()
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        categorySelectors
+
+                        tableHeader
+
+                        ForEach(posts) { post in
+                            NavigationLink(destination: ReportDetailView(postId: post.id)) {
+                                tableRow(post: post)
+                            }
+                            Divider()
+                        }
+
+                        paginationControls
+                    }
+                    .padding()
+                }
+                .onAppear {
+                    fetchCrimeStats()
+                }
+                .sheet(isPresented: $showCreateSheet, onDismiss: {
+                    currentPage = 1
+                    fetchCrimeStats()
+                }) {
+                    ReportCreateView()
+                }
             }
         }
     }
@@ -93,6 +99,9 @@ struct ReportView: View {
                         fetchCrimeStats()
                     }
             }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
 
             HStack(spacing: 12) {
                 LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: Array(categoryData.crimeTypeMap.keys).sorted())
@@ -105,6 +114,9 @@ struct ReportView: View {
                         fetchCrimeStats()
                     }
             }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
         }
     }
 
@@ -230,3 +242,4 @@ struct ReportView: View {
         }
     }
 }
+
