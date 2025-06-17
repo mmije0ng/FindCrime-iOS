@@ -3,7 +3,7 @@
 //
 //  Created by 박미정 on 6/15/25.
 //
-
+//
 import SwiftUI
 
 struct LabeledPicker: View {
@@ -22,8 +22,15 @@ struct LabeledPicker: View {
                     Text(option)
                 }
             }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .pickerStyle(MenuPickerStyle())
+            .padding(.horizontal)
+            .frame(height: 40)
+            .background(Color.white)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+            )
         }
     }
 }

@@ -16,56 +16,78 @@ struct CrimeStatsMapView: View {
     @State private var crimeRisk: String?
     @State private var region: MKCoordinateRegion = regionCoordinates["전국"]!
     @State private var markerCoordinate: CLLocationCoordinate2D? = nil
-
+    
     var body: some View {
-        VStack(spacing: 0) {
-            Text("우리 지역 범죄 통계 조회")
-                .font(.title2.bold())
-                .padding(.vertical)
+        ZStack {
+            // 🔹 전체 배경 하늘색
+            Color(red: 210/255, green: 230/255, blue: 255/255)
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 16) {
-                    LabeledPicker(title: "연도", selection: $selectedYear, options: ["2023"])
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 13) {
+                        Text("우리 지역 범죄 통계 조회")
+                            .font(.title2.bold())
+                            .padding(.top)
 
-                    HStack(spacing: 12) {
-                        LabeledPicker(title: "시·도", selection: $selectedSido, options: Array(categoryData.areaMap.keys).sorted())
-                            .onChange(of: selectedSido) {
-                                selectedGugun = categoryData.areaMap[selectedSido]?.first ?? ""
+                        VStack(spacing: 16) {
+                            // 연도
+                            LabeledPicker(title: "연도", selection: $selectedYear, options: ["2023"])
+
+                            // 지역 선택
+                            HStack(spacing: 12) {
+                                LabeledPicker(title: "시·도", selection: $selectedSido, options: Array(categoryData.areaMap.keys).sorted())
+                                    .onChange(of: selectedSido) {
+                                        selectedGugun = categoryData.areaMap[selectedSido]?.first ?? ""
+                                    }
+
+                                LabeledPicker(title: "구·군", selection: $selectedGugun, options: categoryData.areaMap[selectedSido] ?? [])
                             }
 
-                        LabeledPicker(title: "구·군", selection: $selectedGugun, options: categoryData.areaMap[selectedSido] ?? [])
-                    }
+                            // 범죄 유형
+                            HStack(spacing: 12) {
+                                LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: Array(categoryData.crimeTypeMap.keys).sorted())
+                                    .onChange(of: selectedCrimeType) {
+                                        selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+                                    }
 
-                    HStack(spacing: 12) {
-                        LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: Array(categoryData.crimeTypeMap.keys).sorted())
-                            .onChange(of: selectedCrimeType) {
-                                selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+                                LabeledPicker(title: "범죄 세부", selection: $selectedCrimeDetailType, options: categoryData.crimeTypeMap[selectedCrimeType] ?? [])
                             }
 
-                        LabeledPicker(title: "범죄 세부", selection: $selectedCrimeDetailType, options: categoryData.crimeTypeMap[selectedCrimeType] ?? [])
+                            // 통계 조회 버튼
+                            Button(action: fetchCrimeStats) {
+                                Text("통계 조회")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.top, 4)
+                        }
+                        // 🔲 흰 배경 박스
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.white)
+                                .shadow(color: .gray.opacity(0.1), radius: 5, x: 0, y: 2)
+                        )
+                        .padding(.horizontal)
                     }
-
-                    Button(action: fetchCrimeStats) {
-                        Text("통계 조회")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                    .padding(.top)
                 }
-                .padding(.horizontal)
-            }
 
-            MapViewRepresentable(location: markerCoordinate, crimeCount: crimeCount, crimeRisk: crimeRisk, region: $region)
-                .frame(minHeight: 380, maxHeight: .infinity)
-        }
-        .onAppear {
-            if selectedCrimeType.isEmpty {
-                selectedCrimeType = Array(categoryData.crimeTypeMap.keys).sorted().first ?? ""
-                selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+                // 📍 지도
+                MapViewRepresentable(location: markerCoordinate, crimeCount: crimeCount, crimeRisk: crimeRisk, region: $region)
+                    .frame(minHeight: 250, maxHeight: .infinity)
+            }
+            .onAppear {
+                if selectedCrimeType.isEmpty {
+                    selectedCrimeType = Array(categoryData.crimeTypeMap.keys).sorted().first ?? ""
+                    selectedCrimeDetailType = categoryData.crimeTypeMap[selectedCrimeType]?.first ?? ""
+                }
             }
         }
     }
@@ -143,3 +165,4 @@ let regionCenterCoordinates: [String: CLLocationCoordinate2D] = [
 //    "부산": CLLocationCoordinate2D(latitude: 35.1796, longitude: 129.0756),
     // 필요한 시도는 추가
 ]
+ 

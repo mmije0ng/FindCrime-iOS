@@ -9,11 +9,12 @@ struct MainIntroView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Text("FindCrime")
+            Text("Find Crime")
                 .font(.largeTitle.bold())
                 .foregroundColor(.blue)
 
-            Image(systemName: "map.fill")
+//            Image(systemName: "map.fill")
+            Image("lights")
                 .resizable()
                 .frame(width: 100, height: 100)
                 .foregroundColor(.blue)
@@ -72,7 +73,8 @@ struct MainIntroView: View {
 
     /// ✅ 백엔드에 카카오 로그인 accessToken 전달
     func loginToBackend(with accessToken: String) {
-        guard let url = URL(string: "http://localhost:8080/api/auth/login/kakao") else { return }
+        let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
+        guard let url = URL(string: baseURL + "/api/auth/login/kakao") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

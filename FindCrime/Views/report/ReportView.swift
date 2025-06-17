@@ -40,49 +40,67 @@ struct ReportView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Text("지역 제보 조회")
-                        .font(.title2.bold())
-                    Spacer()
-                    Button(action: {
-                        showCreateSheet = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+            ZStack {
+                Color(red: 210/255, green: 230/255, blue: 255/255)
+                    .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        categorySelectors
-
-                        tableHeader
-
-                        ForEach(posts) { post in
-                            NavigationLink(destination: ReportDetailView(postId: post.id)) {
-                                tableRow(post: post)
-                            }
-                            Divider()
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer()
+                        Text("지역 사건 제보")
+                            .font(.title2.bold())
+                        Spacer()
+                        Button(action: {
+                            showCreateSheet = true
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .padding(5)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .shadow(radius: 2)
                         }
-
-                        paginationControls
                     }
                     .padding()
-                }
-                .onAppear {
-                    fetchCrimeStats()
-                }
-                .sheet(isPresented: $showCreateSheet, onDismiss: {
-                    currentPage = 1
-                    fetchCrimeStats()
-                }) {
-                    ReportCreateView()
+
+                    ScrollView {
+                        VStack(spacing: 25) {
+                            categorySelectors
+                                .padding()
+                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                                .padding(.horizontal)
+
+//                            tableHeader
+//                                .background(Color(.systemGray5))
+//                                .cornerRadius(8)
+
+                            VStack(spacing: 0) {
+                                ForEach(posts) { post in
+                                    NavigationLink(destination: ReportDetailView(postId: post.id)) {
+                                        tableRow(post: post)
+                                    }
+                                    Divider()
+                                }
+                            }
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(radius: 1)
+
+                            paginationControls
+                        }
+                        .padding()
+                    }
+                    .sheet(isPresented: $showCreateSheet, onDismiss: {
+                        currentPage = 1
+                        fetchCrimeStats()
+                    }) {
+                        ReportCreateView()
+                    }
                 }
             }
+        }
+        .onAppear {
+            fetchCrimeStats()
         }
     }
 
@@ -99,9 +117,6 @@ struct ReportView: View {
                         fetchCrimeStats()
                     }
             }
-            .frame(maxWidth: .infinity)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
 
             HStack(spacing: 12) {
                 LabeledPicker(title: "범죄 종류", selection: $selectedCrimeType, options: Array(categoryData.crimeTypeMap.keys).sorted())
@@ -114,26 +129,35 @@ struct ReportView: View {
                         fetchCrimeStats()
                     }
             }
-            .frame(maxWidth: .infinity)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
         }
     }
+    
+//    var tableHeader: some View {
+//        HStack {
+//            Text("제목")
+//                .font(.subheadline)
+//                .fontWeight(.medium)
+//                .foregroundColor(.gray)
+//                .frame(maxWidth: .infinity)
+//                .multilineTextAlignment(.center)
+//
+//            Text("작성일")
+//                .font(.subheadline)
+//                .fontWeight(.medium)
+//                .foregroundColor(.gray)
+//                .frame(width: 120)
+//                .multilineTextAlignment(.center)
+//        }
+//        .padding(.vertical, 10)
+//        .background(Color.white)
+//        .cornerRadius(10)
+//        .overlay(
+//            RoundedRectangle(cornerRadius: 10)
+//                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+//        )
+//        .padding(.horizontal, 4)
+//    }
 
-    var tableHeader: some View {
-        HStack {
-            Text("제목")
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-            Text("작성일")
-                .fontWeight(.semibold)
-                .frame(width: 120)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.vertical, 8)
-        .background(Color(.systemGray6))
-    }
 
     func tableRow(post: ReportPost) -> some View {
         HStack {
@@ -146,7 +170,8 @@ struct ReportView: View {
                 .frame(width: 120)
                 .multilineTextAlignment(.center)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .background(Color.white)
     }
 
     var paginationControls: some View {
@@ -156,15 +181,15 @@ struct ReportView: View {
         return HStack(spacing: 8) {
             if currentPage > 1 {
                 Button(action: {
-                    currentPage = max(1, currentPage - 1)
+                    currentPage -= 1
                     fetchCrimeStats()
                 }) {
-                    Text("<")
-                        .foregroundColor(.blue)
+                    Image(systemName: "chevron.left")
+                        .padding(6)
                 }
             }
 
-            ForEach(startPage...endPage, id: \ .self) { page in
+            ForEach(startPage...endPage, id: \.self) { page in
                 Button(action: {
                     currentPage = page
                     fetchCrimeStats()
@@ -180,11 +205,11 @@ struct ReportView: View {
 
             if currentPage < totalPages {
                 Button(action: {
-                    currentPage = min(totalPages, currentPage + 1)
+                    currentPage += 1
                     fetchCrimeStats()
                 }) {
-                    Text(">")
-                        .foregroundColor(.blue)
+                    Image(systemName: "chevron.right")
+                        .padding(6)
                 }
             }
         }
@@ -242,4 +267,3 @@ struct ReportView: View {
         }
     }
 }
-
