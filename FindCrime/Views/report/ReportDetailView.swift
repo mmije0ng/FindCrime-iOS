@@ -99,49 +99,68 @@ struct ReportDetailView: View {
     }
 
     func fetchDetail() {
-        let userId = UserDefaults.standard.integer(forKey: "userId")
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
-        let urlString = "\(baseURL)/api/post/\(postId)?memberId=\(userId)"
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: "\(baseURL)/api/post/\(postId)") else { return }
 
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            if let data = data {
-                do {
-                    let decoded = try JSONDecoder().decode(ReportDetailResponse.self, from: data)
-                    DispatchQueue.main.async {
-                        detail = decoded.result
-                    }
-                } catch {
-                    print("❌ 디코딩 실패: \(error)")
-                }
-            } else if let error = error {
-                print("❌ 요청 실패: \(error.localizedDescription)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        if let token = UserDefaults.standard.string(forKey: "accessToken") {
+            request.setValue(token, forHTTPHeaderField: "Authorization")
+        }
+
+        NetworkManager.shared.requestWithAuthRetry(request) { data, response, error in
+            if let error = error {
+                print("❌ 요청 실패:", error.localizedDescription)
+                return
             }
-        }.resume()
+            guard let data = data else { return }
+
+            do {
+                let decoded = try JSONDecoder().decode(ReportDetailResponse.self, from: data)
+                DispatchQueue.main.async {
+                    self.detail = decoded.result  // ✅ 이제 user 대신 detail 업데이트
+                }
+            } catch {
+                print("❌ 디코딩 실패:", error)
+                print(String(data: data, encoding: .utf8) ?? "")
+            }
+        }
     }
+
 
     func toggleLike() {
         guard var currentDetail = detail else { return }
-        let userId = UserDefaults.standard.integer(forKey: "userId")
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
         let action = currentDetail.isLiked ? "DELETE" : "POST"
-        let urlString = "\(baseURL)/api/post/like/\(userId)/\(postId)"
+        let urlString = "\(baseURL)/api/post/like/\(postId)"
         guard let url = URL(string: urlString) else { return }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = action
-
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            if let error = error {
-                print("❌ 좋아요 요청 실패: \(error.localizedDescription)")
-                return
+        if action == "POST" {
+            // 좋아요 등록 → POST 요청 (Body 없음)
+            NetworkManager.shared.post(url, body: [:]) { _, response, error in
+                if let error = error {
+                    print("❌ 좋아요 등록 실패: \(error.localizedDescription)")
+                    return
+                }
+                DispatchQueue.main.async {
+                    currentDetail.isLiked = true
+                    detail = currentDetail
+                }
             }
-
-            DispatchQueue.main.async {
-                currentDetail.isLiked.toggle()
-                detail = currentDetail
+        } else {
+            // 좋아요 취소 → DELETE 요청
+            NetworkManager.shared.request(url, method: "DELETE") { _, response, error in
+                if let error = error {
+                    print("❌ 좋아요 취소 실패: \(error.localizedDescription)")
+                    return
+                }
+                DispatchQueue.main.async {
+                    currentDetail.isLiked = false
+                    detail = currentDetail
+                }
             }
-        }.resume()
+        }
     }
 
     func formatDate(_ isoDate: String) -> String {

@@ -92,19 +92,27 @@ struct MyPageView: View {
     }
 
     func fetchUserInfo() {
-        let userId = UserDefaults.standard.integer(forKey: "userId")
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
-        guard let url = URL(string: "\(baseURL)/api/member/\(userId)") else { return }
-
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        guard let url = URL(string: "\(baseURL)/api/member") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = UserDefaults.standard.string(forKey: "accessToken") {
+            request.setValue(token, forHTTPHeaderField: "Authorization")
+        }
+        
+        NetworkManager.shared.requestWithAuthRetry(request) { data, response, error in
             if let data = data {
-                if let decoded = try? JSONDecoder().decode(MyPageResponse.self, from: data) {
+                do {
+                    let decoded = try JSONDecoder().decode(MyPageResponse.self, from: data)
                     DispatchQueue.main.async {
-                        user = decoded.result
+                        self.user = decoded.result
                     }
+                } catch {
+                    print("❌ 디코딩 실패:", error)
                 }
             }
-        }.resume()
+        }
     }
 
     func formatDate(_ isoDate: String) -> String {

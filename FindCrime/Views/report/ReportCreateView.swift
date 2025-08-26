@@ -60,13 +60,8 @@ struct ReportCreateView: View {
     }
 
     func createReportPost() {
-        let userId = UserDefaults.standard.integer(forKey: "userId")
-        let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
-        guard let url = URL(string: baseURL + "/api/post/\(userId)") else { return }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://127.0.0.1:8080"
+        guard let url = URL(string: "\(baseURL)/api/post") else { return }
 
         let body: [String: Any] = [
             "postTitle": postTitle,
@@ -77,16 +72,22 @@ struct ReportCreateView: View {
             "crimeDetailType": crimeDetailType
         ]
 
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return }
-        request.httpBody = httpBody
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        // ✅ NetworkManager 활용 (401/403 시 자동 재발급)
+        NetworkManager.shared.post(url, body: body) { data, response, error in
+            if let error = error {
+                print("❌ 요청 실패:", error.localizedDescription)
+                return
+            }
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📌 응답 코드:", httpResponse.statusCode)
+            }
             if let data = data, let raw = String(data: data, encoding: .utf8) {
-                print("✅ 등록 응답: \(raw)")
+                print("✅ 등록 응답:", raw)
             }
             DispatchQueue.main.async {
                 presentationMode.wrappedValue.dismiss()
             }
-        }.resume()
+        }
     }
+
 }

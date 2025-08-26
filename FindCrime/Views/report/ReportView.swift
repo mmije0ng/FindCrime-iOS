@@ -14,14 +14,14 @@ struct ReportPost: Identifiable, Decodable {
 
 struct ReportResponse: Decodable {
     let isSuccess: Bool
-    let result: ReportResult
+    let result: ReportResult?
 }
 
 struct ReportResult: Decodable {
-    let postList: [ReportPost]
-    let totalPage: Int
-    let isFirst: Bool
-    let isLast: Bool
+    let postList: [ReportPost]?
+    let totalPage: Int?
+    let isFirst: Bool?
+    let isLast: Bool?
 }
 
 struct ReportView: View {
@@ -70,16 +70,18 @@ struct ReportView: View {
                                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
                                 .padding(.horizontal)
 
-//                            tableHeader
-//                                .background(Color(.systemGray5))
-//                                .cornerRadius(8)
-
                             VStack(spacing: 0) {
-                                ForEach(posts) { post in
-                                    NavigationLink(destination: ReportDetailView(postId: post.id)) {
-                                        tableRow(post: post)
+                                if posts.isEmpty {
+                                    Text("게시글이 없습니다.")
+                                        .foregroundColor(.gray)
+                                        .padding()
+                                } else {
+                                    ForEach(posts) { post in
+                                        NavigationLink(destination: ReportDetailView(postId: post.id)) {
+                                            tableRow(post: post)
+                                        }
+                                        Divider()
                                     }
-                                    Divider()
                                 }
                             }
                             .background(Color.white)
@@ -131,33 +133,6 @@ struct ReportView: View {
             }
         }
     }
-    
-//    var tableHeader: some View {
-//        HStack {
-//            Text("제목")
-//                .font(.subheadline)
-//                .fontWeight(.medium)
-//                .foregroundColor(.gray)
-//                .frame(maxWidth: .infinity)
-//                .multilineTextAlignment(.center)
-//
-//            Text("작성일")
-//                .font(.subheadline)
-//                .fontWeight(.medium)
-//                .foregroundColor(.gray)
-//                .frame(width: 120)
-//                .multilineTextAlignment(.center)
-//        }
-//        .padding(.vertical, 10)
-//        .background(Color.white)
-//        .cornerRadius(10)
-//        .overlay(
-//            RoundedRectangle(cornerRadius: 10)
-//                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-//        )
-//        .padding(.horizontal, 4)
-//    }
-
 
     func tableRow(post: ReportPost) -> some View {
         HStack {
@@ -175,54 +150,60 @@ struct ReportView: View {
     }
 
     var paginationControls: some View {
+        if totalPages <= 1 {
+            return AnyView(EmptyView()) // 페이지 0 or 1 → 버튼 없음
+        }
+
         let startPage = max(1, min(currentPage - maxVisiblePages / 2, max(1, totalPages - maxVisiblePages + 1)))
         let endPage = min(totalPages, startPage + maxVisiblePages - 1)
 
-        return HStack(spacing: 8) {
-            if currentPage > 1 {
-                Button(action: {
-                    currentPage -= 1
-                    fetchCrimeStats()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .padding(6)
+        return AnyView(
+            HStack(spacing: 8) {
+                if currentPage > 1 {
+                    Button(action: {
+                        currentPage -= 1
+                        fetchCrimeStats()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .padding(6)
+                    }
                 }
-            }
 
-            ForEach(startPage...endPage, id: \.self) { page in
-                Button(action: {
-                    currentPage = page
-                    fetchCrimeStats()
-                }) {
-                    Text("\(page)")
-                        .padding(6)
-                        .frame(minWidth: 30)
-                        .background(currentPage == page ? Color.blue : Color.gray.opacity(0.2))
-                        .foregroundColor(currentPage == page ? .white : .black)
-                        .cornerRadius(6)
+                if startPage <= endPage {
+                    ForEach(startPage...endPage, id: \.self) { page in
+                        Button(action: {
+                            currentPage = page
+                            fetchCrimeStats()
+                        }) {
+                            Text("\(page)")
+                                .padding(6)
+                                .frame(minWidth: 30)
+                                .background(currentPage == page ? Color.blue : Color.gray.opacity(0.2))
+                                .foregroundColor(currentPage == page ? .white : .black)
+                                .cornerRadius(6)
+                        }
+                    }
                 }
-            }
 
-            if currentPage < totalPages {
-                Button(action: {
-                    currentPage += 1
-                    fetchCrimeStats()
-                }) {
-                    Image(systemName: "chevron.right")
-                        .padding(6)
+                if currentPage < totalPages {
+                    Button(action: {
+                        currentPage += 1
+                        fetchCrimeStats()
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .padding(6)
+                    }
                 }
             }
-        }
-        .padding(.top, 10)
+            .padding(.top, 10)
+        )
     }
 
     func fetchCrimeStats() {
-        let userId = UserDefaults.standard.integer(forKey: "userId")
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
 
         var components = URLComponents(string: baseURL + "/api/post")!
         components.queryItems = [
-            URLQueryItem(name: "memberId", value: String(userId)),
             URLQueryItem(name: "areaName", value: selectedSido),
             URLQueryItem(name: "areaDetailName", value: selectedGugun),
             URLQueryItem(name: "crimeType", value: selectedCrimeType),
@@ -232,23 +213,34 @@ struct ReportView: View {
 
         guard let url = components.url else { return }
 
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        // ✅ NetworkManager 사용 → 토큰 자동 포함
+        NetworkManager.shared.request(url) { data, _, error in
             if let data = data {
                 do {
                     let decoded = try JSONDecoder().decode(ReportResponse.self, from: data)
                     DispatchQueue.main.async {
-                        posts = decoded.result.postList
-                        totalPages = decoded.result.totalPage
+                        // 안전하게 nil 처리
+                        self.posts = decoded.result?.postList ?? []
+                        self.totalPages = decoded.result?.totalPage ?? 1
                     }
                 } catch {
                     print("❌ 디코딩 실패: \(error)")
+                    print(String(data: data, encoding: .utf8) ?? "")
+                    DispatchQueue.main.async {
+                        self.posts = []
+                        self.totalPages = 1
+                    }
                 }
             } else if let error = error {
                 print("❌ 요청 실패: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.posts = []
+                    self.totalPages = 1
+                }
             }
-        }.resume()
+        }
     }
-
+    
     func formatDate(_ isoDate: String) -> String {
         let trimmed = isoDate.trimmingCharacters(in: .whitespacesAndNewlines)
 

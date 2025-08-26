@@ -3,30 +3,28 @@ import KakaoSDKUser
 
 struct MainIntroView: View {
     @AppStorage("userId") var userId: Int?
-    @EnvironmentObject var authManager: AuthManager // ✅ 로그인 상태 관리 객체
-
+    @EnvironmentObject var authManager: AuthManager
+    
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-
+            
             Text("Find Crime")
                 .font(.largeTitle.bold())
                 .foregroundColor(.blue)
-
-//            Image(systemName: "map.fill")
+            
             Image("lights")
                 .resizable()
                 .frame(width: 100, height: 100)
                 .foregroundColor(.blue)
-
+            
             Text("우리 지역의 범죄 통계와\n가까운 경찰서를 지도에서 찾아보세요.")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
-
+            
             Spacer()
-
-            // ✅ 카카오 로그인 버튼
+            
             Button(action: startKakaoLogin) {
                 HStack {
                     Spacer()
@@ -46,8 +44,8 @@ struct MainIntroView: View {
         }
         .padding()
     }
-
-    /// ✅ 카카오 로그인 실행
+    
+    // ✅ 카카오 로그인 실행
     func startKakaoLogin() {
         if UserApi.isKakaoTalkLoginAvailable() {
             UserApi.shared.loginWithKakaoTalk { oauthToken, error in
@@ -59,7 +57,6 @@ struct MainIntroView: View {
                 }
             }
         } else {
-            // 웹 브라우저로 로그인
             UserApi.shared.loginWithKakaoAccount { oauthToken, error in
                 if let error = error {
                     print("❌ 카카오계정 로그인 실패: \(error)")
@@ -70,46 +67,50 @@ struct MainIntroView: View {
             }
         }
     }
-
-    /// ✅ 백엔드에 카카오 로그인 accessToken 전달
-    func loginToBackend(with accessToken: String) {
+    
+    // ✅ 백엔드 로그인 요청
+    func loginToBackend(with kakaoAccessToken: String) {
         let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://localhost:8080"
         guard let url = URL(string: baseURL + "/api/auth/login/kakao") else { return }
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            if let data = data {
-                if let raw = String(data: data, encoding: .utf8) {
-                    print("📦 백엔드 응답 원문: \(raw)")
+        
+        // ✅ 헤더를 통째로 설정 (Authorization 강제 적용)
+        request.setValue("Bearer \(kakaoAccessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // ✅ 요청 직전 최종 request 로그 출력
+        print("📌 최종 요청 URL: \(url.absoluteString)")
+        print("📌 최종 요청 객체: \(request)")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📌 서버 응답 코드: \(httpResponse.statusCode)")
+                
+                if let accessToken = httpResponse.allHeaderFields["Authorization"] as? String {
+                    let rawAccess = accessToken.replacingOccurrences(of: "Bearer ", with: "")
+                    UserDefaults.standard.set(rawAccess, forKey: "accessToken")
+                    print("✅ 서버 JWT AccessToken 저장 완료: \(rawAccess)")
                 }
 
-                if let response = try? JSONDecoder().decode(KakaoLoginResponse.self, from: data) {
-                    DispatchQueue.main.async {
-                        // ✅ 로그인 성공 → userId 저장 + 로그인 상태 전환
-                        self.userId = response.result.userId
-                        self.authManager.isLoggedIn = true
-                    }
-                } else {
-                    print("❌ 백엔드 응답 파싱 실패 (디코딩 실패)")
+                if let refreshToken = httpResponse.allHeaderFields["Refresh-Token"] as? String {
+                    UserDefaults.standard.set(refreshToken, forKey: "refreshToken") // 그대로 저장
                 }
-            } else if let error = error {
+            }
+            
+            if let error = error {
                 print("❌ 네트워크 오류: \(error)")
+                return
+            }
+            
+            if let data = data, let raw = String(data: data, encoding: .utf8) {
+                print("📦 백엔드 응답 원문: \(raw)")
+            }
+            
+            DispatchQueue.main.async {
+                self.authManager.isLoggedIn = true
             }
         }.resume()
     }
-}
-
-// MARK: - 백엔드 응답 모델
-struct KakaoLoginResponse: Decodable {
-    let isSuccess: Bool
-    let code: String
-    let message: String
-    let result: KakaoLoginResult
-}
-
-struct KakaoLoginResult: Decodable {
-    let userId: Int
 }

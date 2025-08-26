@@ -98,17 +98,40 @@ struct CrimeStatsMapView: View {
 
         guard let url = URL(string: urlStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "") else { return }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data,
-                  let decoded = try? JSONDecoder().decode(CrimeStatsResponse.self, from: data) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
 
-            DispatchQueue.main.async {
-                self.crimeCount = decoded.result.crimeCount
-                self.crimeRisk = decoded.result.crimeRisk
-                self.updateRegionAndMarker()
+        // ✅ JWT 추가
+        if let token = UserDefaults.standard.string(forKey: "accessToken") {
+            request.setValue(token, forHTTPHeaderField: "Authorization")
+        }
+        
+        // ✅ NetworkManager 통해 요청 (401/403 시 자동 토큰 재발급 후 재시도)
+        NetworkManager.shared.requestWithAuthRetry(request) { data, response, error in
+            if let error = error {
+                print("❌ 요청 실패:", error.localizedDescription)
+                return
             }
-        }.resume()
+            
+            guard let data = data else {
+                print("❌ 데이터 없음")
+                return
+            }
+            
+            do {
+                let decoded = try JSONDecoder().decode(CrimeStatsResponse.self, from: data)
+                DispatchQueue.main.async {
+                    self.crimeCount = decoded.result.crimeCount
+                    self.crimeRisk = decoded.result.crimeRisk
+                    self.updateRegionAndMarker()
+                }
+            } catch {
+                print("❌ 디코딩 실패:", error)
+                print(String(data: data, encoding: .utf8) ?? "")
+            }
+        }
     }
+
 
     func updateRegionAndMarker() {
         let combined = "\(selectedSido)\(selectedGugun)"
